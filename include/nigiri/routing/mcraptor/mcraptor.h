@@ -158,6 +158,7 @@ struct mcraptor {
                        n_locations_ * (kMaxTransfers + 1)},
                       n_locations_,
                       kMaxTransfers + 1U};
+    tmp_max_delay = std::vector<delta_t>(n_locations_, kInvalid);
   }
 
   [[nodiscard]] algo_stats_t get_stats() const { return stats_; }
@@ -208,9 +209,71 @@ struct mcraptor {
 
       auto any_marked = false;
       prev_round_station_mark_.for_each_set_bit([&](std::uint64_t const i) {
+        auto transports = std::vector<delta_t>(tt_.location_routes_[location_idx_t{i}].size(), kInvalid);
         for (auto const& r : tt_.location_routes_[location_idx_t{i}]) {
           any_marked = true;
           route_mark_.set(to_idx(r), true);
+        }
+
+        auto prev_round_bag = get_round_bag(cista::to_idx(i), k - 1);
+        auto start = (*std::max_element(prev_round_bag.labels_.begin(), prev_round_bag.labels_.end(), [](auto a, auto b){
+                       return a.arr_t_ < b.arr_t_;
+                     })).arr_t_;
+        auto end = (*std::min_element(prev_round_bag.labels_.begin(), prev_round_bag.labels_.end(), [](auto a, auto b){
+                     return a.arr_t_ < b.arr_t_;
+                   })).arr_t_;
+
+        if (start != kInvalid ) {
+          for (int i_r = 0; i_r < tt_.location_routes_[location_idx_t{i}].size(); ++i_r) {
+            auto const& r = tt_.location_routes_[location_idx_t{i}][i_r];
+            auto const& stop_seq = tt_.route_location_seq_[r];
+            int stop_idx = 1;
+            for(; stop_idx != stop_seq.size(); ++stop_idx){
+              if(location_idx_t{i} == stop{stop_seq[stop_idx]}.location_idx()) break;
+            }
+
+            if(stop_idx == stop_seq.size()) continue;
+
+            auto const [day, mam] = split(start);
+            auto const new_et = get_earliest_transport(
+                k, r, stop_idx, day, mam);
+            if (!new_et.is_valid()) continue;
+
+            auto arr_t_ =
+                    time_at_stop(r, new_et, stop_idx,
+                                 kFwd ? event_type::kDep : event_type::kArr);
+            transports[i_r] = arr_t_ + dir(1);
+          }
+        }
+        while(true){
+          auto it = std::max_element(transports.begin(), transports.end());
+          if(it == transports.end() || *it == kInvalid) break;
+          auto i_r = std::distance(transports.begin(), it);
+          auto const& r = tt_.location_routes_[location_idx_t{i}][i_r];
+          auto const& stop_seq = tt_.route_location_seq_[r];
+          int stop_idx = 1;
+          for(; stop_idx != stop_seq.size(); ++stop_idx){
+            if(location_idx_t{i} == stop{stop_seq[stop_idx]}.location_idx()) break;
+          }
+          if(stop_idx == stop_seq.size()) {
+            transports[i_r] = kInvalid;
+            continue;
+          }
+
+          auto const [day, mam] = split(transports[i_r]);
+          auto const new_et = get_earliest_transport(
+              k, r, stop_idx, day, mam);
+          if (!new_et.is_valid()) {
+            transports[i_r] = kInvalid;
+            continue;
+          }
+
+          auto arr_t_ =
+              time_at_stop(r, new_et, stop_idx,
+                           kFwd ? event_type::kDep : event_type::kArr);
+          transports[i_r] = arr_t_ + dir(1);
+          tmp_max_delay[i] = arr_t_;
+          if(remain_at_station(i, k, arr_t_) < 0.03) break;
         }
       });
 
@@ -417,6 +480,17 @@ private:
     return result;
   }
 
+  float remain_at_station(auto l, auto k, delta_t possible_start_t){
+    vector<mcraptor_label> labels = {};
+    get_labels_after_(l, k, possible_start_t, labels, 0);
+    if(k==1) return 1 - (transferProbability(labels[0].arr_t_ - possible_start_t) + 0.05); // TODO ist nur ein hack. ordentlich machen
+    auto counterprob = 1 - transferProbability(labels[0].arr_t_ - possible_start_t);
+    for (int i = 1; i < labels.size(); ++i) {
+      counterprob = counterprob * (1 - transferProbability(labels[i].arr_t_ - possible_start_t));
+    }
+    return counterprob;
+  }
+
   float cum_success_chance(auto l, auto k, delta_t possible_start_t){
     return cum_prob(l, k, possible_start_t);
   }
@@ -454,16 +528,12 @@ private:
         auto start = (*std::max_element(prev_round_bag.labels_.begin(), prev_round_bag.labels_.end(), [](auto a, auto b){
                        return a.arr_t_ < b.arr_t_;
                      })).arr_t_;
-        auto end = (*std::min_element(prev_round_bag.labels_.begin(), prev_round_bag.labels_.end(), [](auto a, auto b){
-                     return a.arr_t_ < b.arr_t_;
-                   })).arr_t_;
+        auto end = tmp_max_delay[l_idx];
 
         if (start != kInvalid ) { // && is_better_or_eq(prev_round_time, et_time_at_stop)
-          auto max_delay = 3000;
           while(true){
             auto const [day, mam] = split(start);
-            auto const new_et = get_earliest_transport(k, r, stop_idx, day, mam,
-                                                       stp.location_idx());
+            auto const new_et = get_earliest_transport(k, r, stop_idx, day, mam);
             if (!new_et.is_valid()) break;
 
             mcraptor_label new_et_label = {.arr_t_ = time_at_stop(r, new_et, stop_idx,kFwd ? event_type::kDep : event_type::kArr), .trip_l_ = stp.location_idx(),
@@ -471,7 +541,11 @@ private:
 
             //TODO ich iteriere ja hier bis zum ende. kann ja aber auf der Route auch noch weiter vorne einsteigen und würde dann den selben Transport zweimal iterieren?
             any_marked = any_marked | iterate_without_enter(new_et_label, i + 1, r, k);
-            if(start < end + dir(max_delay)) break;
+            if(start < end) break;
+            if(end == kInvalid){
+              std::cout << "end invalid = nur ein möglicher transport" << std::endl;
+              break;
+            }
             start = new_et_label.arr_t_ + dir(1);
           }
         }
@@ -703,8 +777,7 @@ private:
                                    route_idx_t const r,
                                    stop_idx_t const stop_idx,
                                    day_idx_t const day_at_stop,
-                                   minutes_after_midnight_t const mam_at_stop,
-                                   location_idx_t const l) {
+                                   minutes_after_midnight_t const mam_at_stop) {
     ++stats_.n_earliest_trip_calls_;
 
     auto const event_times = tt_.event_times_at_stop(
@@ -796,6 +869,7 @@ private:
   day_idx_t base_;
   raptor_stats stats_;
   transfer_time_settings transfer_time_settings_;
+  std::vector<delta_t> tmp_max_delay;
 };
 
 }  // namespace nigiri::routing
