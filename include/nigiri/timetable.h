@@ -209,6 +209,12 @@ struct timetable {
     route_section_clasz_.emplace_back(clasz_sections);
     route_clasz_.emplace_back(clasz_sections[0]);
 
+    hash_map<location_idx_t, stop_idx_t> map;
+    for(stop_idx_t i = 0; i < stop_seq.size(); ++i){
+      map[stop{stop_seq[i]}.location_idx()] = i;
+    }
+    stop_indices.emplace_back(map);
+
     auto const bike_sections = bikes_allowed_per_section.size();
     auto const sections_with_bikes_allowed = bikes_allowed_per_section.count();
     auto const bikes_allowed_on_all_sections =
@@ -529,6 +535,9 @@ struct timetable {
 
   // Location -> list of routes
   vecvec<location_idx_t, route_idx_t> location_routes_;
+
+  // Location, Route -> Stop Index
+  vector_map<route_idx_t, hash_map<location_idx_t, stop_idx_t>> stop_indices;
 
   // Route 1:
   //   stop-1-dep: [trip1, trip2, ..., tripN]

@@ -219,20 +219,13 @@ struct mcraptor {
         auto start = (*std::max_element(prev_round_bag.labels_.begin(), prev_round_bag.labels_.end(), [](auto a, auto b){
                        return a.arr_t_ < b.arr_t_;
                      })).arr_t_;
-        auto end = (*std::min_element(prev_round_bag.labels_.begin(), prev_round_bag.labels_.end(), [](auto a, auto b){
-                     return a.arr_t_ < b.arr_t_;
-                   })).arr_t_;
 
         if (start != kInvalid ) {
           for (int i_r = 0; i_r < tt_.location_routes_[location_idx_t{i}].size(); ++i_r) {
             auto const& r = tt_.location_routes_[location_idx_t{i}][i_r];
-            auto const& stop_seq = tt_.route_location_seq_[r];
-            int stop_idx = 1;
-            for(; stop_idx != stop_seq.size(); ++stop_idx){
-              if(location_idx_t{i} == stop{stop_seq[stop_idx]}.location_idx()) break;
-            }
 
-            if(stop_idx == stop_seq.size()) continue;
+            auto stop_idx = tt_.stop_indices[r].find(location_idx_t{i})->second;
+            if(stop_idx == 0) continue;
 
             auto const [day, mam] = split(start);
             auto const new_et = get_earliest_transport(
@@ -250,12 +243,9 @@ struct mcraptor {
           if(it == transports.end() || *it == kInvalid) break;
           auto i_r = std::distance(transports.begin(), it);
           auto const& r = tt_.location_routes_[location_idx_t{i}][i_r];
-          auto const& stop_seq = tt_.route_location_seq_[r];
-          int stop_idx = 1;
-          for(; stop_idx != stop_seq.size(); ++stop_idx){
-            if(location_idx_t{i} == stop{stop_seq[stop_idx]}.location_idx()) break;
-          }
-          if(stop_idx == stop_seq.size()) {
+
+          auto stop_idx = tt_.stop_indices[r].find(location_idx_t{i})->second;
+          if(stop_idx == 0) {
             transports[i_r] = kInvalid;
             continue;
           }
@@ -543,7 +533,7 @@ private:
             any_marked = any_marked | iterate_without_enter(new_et_label, i + 1, r, k);
             if(start < end) break;
             if(end == kInvalid){
-              std::cout << "end invalid = nur ein möglicher transport" << std::endl;
+              //std::cout << "end invalid = nur ein möglicher transport" << std::endl;
               break;
             }
             start = new_et_label.arr_t_ + dir(1);
