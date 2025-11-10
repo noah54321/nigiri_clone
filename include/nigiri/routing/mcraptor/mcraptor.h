@@ -44,39 +44,65 @@ struct mcraptor {
              (this->arr_t_ == l.arr_t_ && this->success_chance == l.success_chance) ||
              (this->arr_t_ > l.arr_t_ && this->success_chance >= l.success_chance);
     }
+
+    bool operator <(mcraptor_label const& other) const{
+      return this->arr_t_ < other.arr_t_;
+    }
   };
 
   struct mcraptor_bag {
-    std::vector<mcraptor_label> labels_{};
+    std::set<mcraptor_label> labels_{};
 
     bool dominates(mcraptor_label const& other_label) const {
-      return std::any_of(labels_.begin(), labels_.end(),
-                         [&](auto const& l) {
-                           return l.dominates(other_label);
-                         });
+      return labels_.lower_bound(other_label)->dominates(other_label);
     }
 
     void add(mcraptor_label const& new_label) {
-      if (this->dominates(new_label)) {
+      auto it = labels_.lower_bound(new_label);
+
+      if(it != labels_.end()){
+        if(it->dominates(new_label)) return;
+      }else if(!labels_.empty()) {
+        it = std::prev(it);
+      } else{
+        labels_.insert(new_label);
         return;
       }
-      auto new_end = std::remove_if(labels_.begin(), labels_.end(),
-                                    [&](auto const& l) {
-                                      return new_label.dominates(l);
-                                    });
-      labels_.erase(new_end, labels_.end());
-      labels_.emplace_back(new_label);
+
+      while (true){
+        if(new_label.dominates(*it)) {
+          it = labels_.erase(it);
+          if (it == labels_.begin()) break;
+          it = std::prev(it);
+        } else
+          break;
+      }
+
+      labels_.insert(new_label);
     }
 
     void unchecked_add(mcraptor_label const& new_label){
-      auto new_end = std::remove_if(labels_.begin(), labels_.end(),
-                                    [&](auto const& l) {
-                                      return new_label.dominates(l);
-                                    });
-      labels_.erase(new_end, labels_.end());
-      labels_.emplace_back(new_label);
+      add(new_label);
+//      auto it = labels_.lower_bound(new_label);
+//
+//      if(it == labels_.end()){
+//        if(!labels_.empty()) {
+//          it = std::prev(it);
+//        } else {
+//          labels_.insert(new_label);
+//          return;
+//        }
+//      }
+//
+//      while (true){
+//        if(!new_label.dominates(*it)) break;
+//        it = labels_.erase(it);
+//        if(it == labels_.begin()) break;
+//        it = std::prev(it);
+//      }
+//
+//      labels_.insert(new_label);
     }
-
   };
 
   struct mcraptor_dest_bag {
@@ -236,15 +262,15 @@ struct mcraptor {
       update_footpaths(k, prf_idx);
 
       station_mark_.for_each_set_bit([&](std::uint64_t const i) {
-        std::sort(best_bag_[i].labels_.begin(), best_bag_[i].labels_.end(),
-                  [](mcraptor_label a, mcraptor_label b) {
-                    return a.arr_t_ < b.arr_t_;
-                  });
-        //TODO Es wird in prun_flaged auch schon vorsortiert.
-        std::sort(location_bags_[i][k].labels_.begin(), location_bags_[i][k].labels_.end(),
-                  [](mcraptor_label a, mcraptor_label b) {
-                    return a.arr_t_ > b.arr_t_;
-                  });
+//        std::sort(best_bag_[i].labels_.begin(), best_bag_[i].labels_.end(),
+//                  [](mcraptor_label a, mcraptor_label b) {
+//                    return a.arr_t_ < b.arr_t_;
+//                  });
+//        //TODO Es wird in prun_flaged auch schon vorsortiert.
+//        std::sort(location_bags_[i][k].labels_.begin(), location_bags_[i][k].labels_.end(),
+//                  [](mcraptor_label a, mcraptor_label b) {
+//                    return a.arr_t_ > b.arr_t_;
+//                  });
       });
 
       update_dest_bag(k);
@@ -588,26 +614,26 @@ private:
 
       //enter transport
       if(prev_round_station_mark_[l_idx]) {
-        auto const& prev_round_bag = get_round_bag(l_idx, k - 1);
+        mcraptor_bag const& prev_round_bag = get_round_bag(l_idx, k - 1);
 
         auto max_delay = delta_t{30};
 
-        auto start = prev_round_bag.labels_[0].arr_t_;
+        auto start = prev_round_bag.labels_.rbegin()->arr_t_;
         delta_t end;
         auto old_size = ets.size();
-        for (int j = 0; j < prev_round_bag.labels_.size(); ++j){
+        for (auto it = prev_round_bag.labels_.rbegin(); it != prev_round_bag.labels_.rend(); it = std::next(it)){
           if(std::any_of(ets.begin(), ets.end(), [&](mcraptor_label label_of_vector){
-                return label_of_vector.dominates(prev_round_bag.labels_[j]);
+                return label_of_vector.dominates(*it);
               })){
             continue;
           }
-          if(start > prev_round_bag.labels_[j].arr_t_){
-            start = prev_round_bag.labels_[j].arr_t_;
+          if(start > it->arr_t_){
+            start = it->arr_t_;
           }
-          end = prev_round_bag.labels_[j].arr_t_ - max_delay;
+          end = it->arr_t_ - max_delay;
 
           if(start < end) continue;
-          if((j+1)<prev_round_bag.labels_.size() && end <= prev_round_bag.labels_[j+1].arr_t_) continue;
+          if(it != prev_round_bag.labels_.rend() && std::next(it) != prev_round_bag.labels_.rend() && end <= std::next(it)->arr_t_) continue;
 
           auto const [day_from, mam_from] = split(start);
 
@@ -741,15 +767,14 @@ private:
 
   void prun_flaged(){
     tmp_station_mark_.for_each_set_bit([&](std::uint64_t const i) {
-      std::sort(tmp_[i].labels_.begin(), tmp_[i].labels_.end(), [](auto a, auto b){
-        return a.arr_t_ < b.arr_t_;
-      });
+//      std::sort(tmp_[i].labels_.begin(), tmp_[i].labels_.end(), [](auto a, auto b){
+//        return a.arr_t_ < b.arr_t_;
+//      });
       auto first_flagged = std::find_if(tmp_[i].labels_.rbegin(), tmp_[i].labels_.rend(), [](auto a){return a.over_limit;});
-      if(first_flagged == tmp_[i].labels_.rend()) --first_flagged;
+      if(first_flagged == tmp_[i].labels_.rend()) first_flagged = std::prev(first_flagged);
       auto value = first_flagged->arr_t_ - 30;
 
-      auto it = tmp_[i].labels_.begin();
-      while (it+1 != tmp_[i].labels_.end()) {
+      for (auto it = tmp_[i].labels_.begin(); std::next(it) != tmp_[i].labels_.end(); ) {
         if(it->arr_t_ < value) it = tmp_[i].labels_.erase(it);
         else break;
       }
