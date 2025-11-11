@@ -87,8 +87,9 @@ struct mcraptor {
       return std::any_of(labels_.begin(),
                          labels_.end(),
                          [&](std::pair<unsigned, mcraptor_label> pair) {
-                           return pair.first <= k &&
-                                  pair.second.dominates(other_label);
+                           return (pair.first <= k &&
+                                  pair.second.dominates(other_label)) ||
+                                  (pair.second.success_chance > 0.90 && pair.second.arr_t_ > other_label.arr_t_);
                          });
     }
 
