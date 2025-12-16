@@ -90,6 +90,7 @@ struct mcraptor {
                            return pair.first <= k &&
                                   pair.second.dominates(other_label);
                          });
+      return false;
     }
 
     void add(mcraptor_label const& new_label, unsigned const& k) {
@@ -205,8 +206,8 @@ struct mcraptor {
     dest_bag_.add({.arr_t_ = get_best(d_worst_at_dest, kInvalid)}, 0);
 
 
-
-    for (auto k = 1U; k != end_k+1; ++k) {
+  //TODO end_k+1 dass es mit normalem raptor übereinstimt
+    for (auto k = 1U; k != end_k; ++k) {
 //      is_dest_.for_each_set_bit([&](std::uint64_t const i) {
 //        dest_bag_.add({.arr_t_ = get_best_time(i)}, k);
 //      });
@@ -579,7 +580,7 @@ private:
 
           et_label.arr_t_ = by_transport;
           if (!best_bag_[l_idx].dominates(et_label) &&
-              !dest_bag_.dominates(et_label, k) &&
+//              !dest_bag_.dominates(et_label, k) &&
               lb_[l_idx] != kUnreachable &&
               !dest_bag_.dominates({.arr_t_ = static_cast<delta_t>(by_transport + lb_[l_idx]), .trip_id = et_label.trip_id, .success_chance = et_label.success_chance}, k)) {
             if(!tmp_[l_idx].dominates(et_label)) {
@@ -689,8 +690,9 @@ private:
 
           new_label.arr_t_ = static_cast<delta_t>(new_label.arr_t_ + transfer_time);
 
-          if (!best_bag_[i].dominates(new_label) &&
-              !dest_bag_.dominates(new_label, k)) {
+          if (!best_bag_[i].dominates(new_label)
+//              && !dest_bag_.dominates(new_label, k)
+              ) {
             if (lb_[i] == kUnreachable) {
               ++stats_.fp_update_prevented_by_lower_bound_;
               continue;
@@ -734,8 +736,9 @@ private:
               tmp_time + dir(adjusted_transfer_time(transfer_time_settings_,
                                                 fp.duration().count())));
 
-          if (!best_bag_[target].dominates(new_label) &&
-              !dest_bag_.dominates(new_label, k)) {
+          if (!best_bag_[target].dominates(new_label)
+//              &&!dest_bag_.dominates(new_label, k)
+              ) {
             auto const lower_bound = lb_[target];
 
             if (lower_bound == kUnreachable ||
