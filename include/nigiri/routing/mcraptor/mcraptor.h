@@ -79,6 +79,7 @@ struct mcraptor {
 
   };
 
+
   struct mcraptor_dest_bag {
     std::vector<std::pair<unsigned, mcraptor_label>> labels_;
 
@@ -88,10 +89,17 @@ struct mcraptor {
                          labels_.end(),
                          [&](std::pair<unsigned, mcraptor_label> pair) {
                            return (pair.first <= k &&
-                                  pair.second.dominates(other_label)) ||
-                                  (pair.second.success_chance > 0.90 && pair.second.arr_t_ > other_label.arr_t_);
+                                  pair.second.dominates(other_label));
                          });
-      return false;
+    }
+
+
+    bool reached_probability(mcraptor_label const& other_label){
+      return std::any_of(labels_.begin(),
+                  labels_.end(),
+                  [&](std::pair<unsigned, mcraptor_label> pair) {
+                    return (pair.second.success_chance > 0.90 && pair.second.arr_t_ > other_label.arr_t_);
+                  });
     }
 
     void add(mcraptor_label const& new_label, unsigned const& k) {
@@ -582,6 +590,7 @@ private:
           et_label.arr_t_ = by_transport;
           if (!best_bag_[l_idx].dominates(et_label) &&
 //              !dest_bag_.dominates(et_label, k) &&
+              !dest_bag_.reached_probability(et_label) &&
               lb_[l_idx] != kUnreachable &&
               !dest_bag_.dominates({.arr_t_ = static_cast<delta_t>(by_transport + lb_[l_idx]), .trip_id = et_label.trip_id, .success_chance = et_label.success_chance}, k)) {
             if(!tmp_[l_idx].dominates(et_label)) {
@@ -691,8 +700,9 @@ private:
 
           new_label.arr_t_ = static_cast<delta_t>(new_label.arr_t_ + transfer_time);
 
-          if (!best_bag_[i].dominates(new_label)
+          if (!best_bag_[i].dominates(new_label) &&
 //              && !dest_bag_.dominates(new_label, k)
+               !dest_bag_.reached_probability(new_label)
               ) {
             if (lb_[i] == kUnreachable) {
               ++stats_.fp_update_prevented_by_lower_bound_;
@@ -739,6 +749,7 @@ private:
 
           if (!best_bag_[target].dominates(new_label)
 //              &&!dest_bag_.dominates(new_label, k)
+               && !dest_bag_.reached_probability(new_label)
               ) {
             auto const lower_bound = lb_[target];
 
