@@ -79,7 +79,6 @@ struct mcraptor {
 
   };
 
-
   struct mcraptor_dest_bag {
     std::vector<std::pair<unsigned, mcraptor_label>> labels_;
 
