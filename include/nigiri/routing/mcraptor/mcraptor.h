@@ -126,7 +126,9 @@ struct mcraptor {
                bool const require_bike_transport,
                bool const require_car_transport,
                bool const is_wheelchair,
-               transfer_time_settings const& tts)
+               transfer_time_settings const& tts,
+               double const cancellation_probability,
+               std::int64_t const max_delay)
       : tt_{tt},
         n_days_{tt_.internal_interval_days().size().count()},
         n_locations_{tt_.n_locations()},
@@ -135,7 +137,9 @@ struct mcraptor {
         is_dest_{is_dest},
         lb_{lb},
         base_{base},
-        transfer_time_settings_{tts} {
+        transfer_time_settings_{tts},
+        can_prob{static_cast<float>(cancellation_probability)},
+        max_delay{static_cast<delta_t>(max_delay)}{
 
     prev_round_station_mark_.resize(n_locations_);
     tmp_station_mark_.resize(n_locations_);
@@ -518,11 +522,12 @@ private:
   }
 
 
-  const delta_t max_delay = delta_t{30};
+  const delta_t max_delay;
+  const float can_prob;
+
   float delay_distribution_paper(delta_t x){
     auto xf = static_cast<float>(x);
-    auto cancelation_probability = 0.95f;
-    return std::min(cancelation_probability, (31 * xf + 2 * max_delay) / (30 * xf + 3 * max_delay));
+    return std::min(can_prob, (31 * xf + 2 * max_delay) / (30 * xf + 3 * max_delay));
   }
 
   float delay_distribution_linear(delta_t x){
@@ -983,6 +988,7 @@ private:
   day_idx_t base_;
   raptor_stats stats_;
   transfer_time_settings transfer_time_settings_;
+  bool cancellation;
 };
 
 }  // namespace nigiri::routing

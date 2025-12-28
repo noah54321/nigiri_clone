@@ -96,6 +96,8 @@ struct query {
   double fastest_direct_factor_{1.0};
   bool slow_direct_{false};
   double fastest_slow_direct_factor_{2.0};
+  double cancellation_probability{true};
+  std::int64_t max_delay;
 };
 
 }  // namespace nigiri::routing

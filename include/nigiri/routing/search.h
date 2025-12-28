@@ -151,7 +151,9 @@ struct search {
         require_bikes_allowed,
         require_cars_allowed,
         q_.prf_idx_ == 2U,
-        tts};
+        tts,
+        q_.cancellation_probability,
+        q_.max_delay};
   }
 
   search(timetable const& tt,

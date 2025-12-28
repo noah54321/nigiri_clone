@@ -101,7 +101,9 @@ struct raptor {
       bool const require_bike_transport,
       bool const require_car_transport,
       bool const is_wheelchair,
-      transfer_time_settings const& tts)
+      transfer_time_settings const& tts,
+      double cancellation_probability = 0.0,
+      std::int64_t max_delay = 0)
       : tt_{tt},
         rtt_{rtt},
         n_days_{tt_.internal_interval_days().size().count()},
