@@ -676,7 +676,7 @@ private:
         tmp_label.success_chance = cum_enter_probability(i, k, tmp_label.arr_t_);
         dest_bag_.add(tmp_label, k);
       }
-      for (mcraptor_label tmp_label :tmp_[i].labels_) {
+      for (mcraptor_label tmp_label :location_bags_[i][k].labels_) {
         if(tmp_label.arr_t_ == kInvalid) continue;
         tmp_label.success_chance = cum_enter_probability(i, k, tmp_label.arr_t_);
         dest_bag_.add(tmp_label, k);
