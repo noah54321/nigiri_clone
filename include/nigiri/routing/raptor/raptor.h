@@ -101,7 +101,8 @@ struct raptor {
       bool const require_bike_transport,
       bool const require_car_transport,
       bool const is_wheelchair,
-      transfer_time_settings const& tts)
+      transfer_time_settings const& tts,
+      std::int64_t max_safety_time = 0)
       : tt_{tt},
         rtt_{rtt},
         n_days_{tt_.internal_interval_days().size().count()},
@@ -123,7 +124,8 @@ struct raptor {
         require_bike_transport_{require_bike_transport},
         require_car_transport_{require_car_transport},
         is_wheelchair_{is_wheelchair},
-        transfer_time_settings_{tts} {
+        transfer_time_settings_{tts},
+        max_safety_time{static_cast<delta_t>(max_safety_time)}{
     assert(Vias == via_stops_.size());
     reset_arrivals();
     // only used for intermodal queries (dist_to_dest != empty)
@@ -156,8 +158,8 @@ struct raptor {
   void add_start(location_idx_t const l, unixtime_t const t) {
     auto const v = (Vias != 0 && is_via_[0][to_idx(l)]) ? 1U : 0U;
     trace_upd("adding start {}: {}, v={}\n", location{tt_, l}, t, v);
-    best_[to_idx(l)][v] = unix_to_delta(base(), t);
-    round_times_[0U][to_idx(l)][v] = unix_to_delta(base(), t);
+    best_[to_idx(l)][v] = unix_to_delta(base(), t) - max_safety_time;
+    round_times_[0U][to_idx(l)][v] = unix_to_delta(base(), t) - max_safety_time;
     state_.station_mark_.set(to_idx(l), true);
   }
 
@@ -432,7 +434,7 @@ private:
                           transfer_time_settings_,
                           tt_.locations_.transfer_time_[location_idx_t{i}]
                               .count()) +
-                      stay.count());
+                      stay.count()) + dir(max_safety_time);
         auto const fp_target_time =
             static_cast<delta_t>(tmp_time + transfer_time);
 
@@ -505,7 +507,7 @@ private:
           auto const fp_target_time = clamp(
               tmp_time + dir(adjusted_transfer_time(transfer_time_settings_,
                                                     fp.duration().count()) +
-                             stay.count()));
+                             stay.count())) + dir(max_safety_time);
 
           if (is_better(fp_target_time, best_[target][target_v]) &&
               is_better(fp_target_time, time_at_dest_[k])) {
@@ -1275,6 +1277,7 @@ private:
   bool require_car_transport_;
   bool is_wheelchair_;
   transfer_time_settings transfer_time_settings_;
+  delta_t max_safety_time;
 };
 
 }  // namespace nigiri::routing

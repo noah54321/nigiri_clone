@@ -126,7 +126,8 @@ struct mcraptor {
                bool const require_bike_transport,
                bool const require_car_transport,
                bool const is_wheelchair,
-               transfer_time_settings const& tts)
+               transfer_time_settings const& tts,
+               std::int64_t max_safety_time = 0)
       : tt_{tt},
         n_days_{tt_.internal_interval_days().size().count()},
         n_locations_{tt_.n_locations()},
