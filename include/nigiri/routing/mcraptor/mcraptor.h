@@ -324,7 +324,7 @@ struct mcraptor {
     std::cout << std::endl;
   }
 
-  const bool should_print = true;
+  const bool should_print = false;
   void reconstruct(query const& q, journey& j) {
 //    std::cout << "done: " << std::endl;
 //    return;
