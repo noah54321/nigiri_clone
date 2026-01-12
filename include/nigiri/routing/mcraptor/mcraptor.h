@@ -535,17 +535,6 @@ private:
     return function(to);
   }
 
-  float trips_succes(delta_t deadline, std::vector<mcraptor_label>& ets){
-    auto result = 0.0f;
-    auto counterprob = 1;
-    for(mcraptor_label const & label: ets){
-      auto prob = transferProbability(deadline - label.arr_t_);
-      result += prob * counterprob;
-      counterprob *= (1 - prob);
-    }
-    return result;
-  }
-
   template <bool transfer=true>
   float cum_prob(auto l, auto k, delta_t possible_start_t, float success_rate = 0.0f){
     auto it = std::lower_bound(best_bag_[l].labels_.begin(), best_bag_[l].labels_.end(), possible_start_t, [](mcraptor_label a, delta_t t){
@@ -908,6 +897,8 @@ private:
                        });
     };
 
+    auto trips_success = 0.0f;
+    auto counterprob = 1;
     constexpr auto const kNDaysToIterate = day_idx_t::value_t{2U};
     for (auto i = day_idx_t::value_t{0U}; i != kNDaysToIterate; ++i) {
       auto const ev_time_range =
@@ -942,7 +933,12 @@ private:
         mcraptor_label new_et_label = {.arr_t_ = time, .trip_l_ = l,
                                         .trip_id = new_et, .success_chance = cum_success_chance(cista::to_idx(l), k-1, time), .over_limit = false};
         ets.push_back(new_et_label);
-        float trips_success = trips_succes(start, ets);
+
+        auto prob = transferProbability(start - time);
+        trips_success += prob * counterprob;
+        counterprob *= (1 - prob);
+
+
         if(trips_success >= 0.95) {
           ets.back().over_limit = true;
           return true;
