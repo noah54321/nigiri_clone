@@ -97,7 +97,7 @@ struct query {
   double fastest_direct_factor_{1.0};
   bool slow_direct_{false};
   double fastest_slow_direct_factor_{2.0};
-  double cancellation_probability{true};
+  double cancellation_probability;
   std::int64_t max_delay;
 };
 
