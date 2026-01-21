@@ -1117,7 +1117,7 @@ private:
           k, tt_.to_unixtime(day_at_stop, mam_at_stop), stop_idx,
           loc{tt_, stop{tt_.route_location_seq_[r][stop_idx]}.location_idx()});
 
-    auto const n_days_to_iterate = kMaxTravelTime / std::chrono::days{1} + 1U;
+    auto const n_days_to_iterate = day_idx_t::value_t{2U};
     for (auto i = day_idx_t::value_t{0U}; i != n_days_to_iterate; ++i) {
       auto const ev_time_range =
           it_range{i == 0U ? seek_first_day() : get_begin_it(event_times),
