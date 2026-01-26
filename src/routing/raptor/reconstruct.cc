@@ -457,7 +457,7 @@ void reconstruct_journey_with_vias(timetable const& tt,
       -> std::optional<std::pair<journey::leg, journey::leg>> {
     auto const fp_duration =
         adjust_transfer_time ? adjusted_transfer_time(q.transfer_time_settings_,
-                                                      fp.duration().count())
+                                                      fp.duration().count()) + q.max_safety_time
                              : fp.duration().count();
 
     auto const backup_v = v;
@@ -648,7 +648,7 @@ void reconstruct_journey_with_vias(timetable const& tt,
                  (k == j.transfers_ + 1U)
                      ? 0_u8_minutes
                      : adjusted_transfer_time(q.transfer_time_settings_,
-                                              tt.locations_.transfer_time_[l])},
+                                              tt.locations_.transfer_time_[l]) + static_cast<u8_minutes>(q.max_safety_time)},
         false, false);
     if (transfer_at_same_stop.has_value()) {
       return std::move(*transfer_at_same_stop);
