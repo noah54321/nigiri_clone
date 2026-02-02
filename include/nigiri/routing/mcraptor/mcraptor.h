@@ -530,10 +530,12 @@ private:
 
   const delta_t max_delay;
   const float can_prob;
+  int delay_max = 30;
+  const float d = (30 * delay_max * can_prob - 31 * delay_max) / (2 - 3 * can_prob);
 
   float delay_distribution_paper(delta_t x){
     auto xf = static_cast<float>(x);
-    return std::min(can_prob, (31 * xf + 2 * max_delay) / (30 * xf + 3 * max_delay));
+    return std::min(can_prob, (31 * xf + 2 * d) / (30 * xf + 3 * d));
   }
 
   float delay_distribution_linear(delta_t x){
