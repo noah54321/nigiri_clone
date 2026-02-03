@@ -571,7 +571,7 @@ private:
   }
 
   float cum_enter_probability(auto l, auto k, delta_t possible_start_t){
-    return cum_prob<false>(l, k, possible_start_t, 0.95f);
+    return cum_prob<false>(l, k, possible_start_t, can_prob);
   }
 
   bool update_route(unsigned const k, route_idx_t const r) {
